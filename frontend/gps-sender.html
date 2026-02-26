@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>GreenNote GPS Sender</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+    background: linear-gradient(135deg, #0B1220 0%, #1a2f3f 100%);
+    color: #e2e8f0;
+    min-height: 100vh;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+  }
+  h1 {
+    font-size: 24px;
+    color: #10b981;
+    margin-bottom: 10px;
+    text-align: center;
+  }
+  .subtitle {
+    font-size: 14px;
+    color: #64748b;
+    text-align: center;
+    margin-bottom: 30px;
+  }
+  .card {
+    background: rgba(13, 24, 41, 0.9);
+    border: 1px solid #1e293b;
+    border-radius: 12px;
+    padding: 25px;
+    width: 100%;
+    max-width: 400px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+  .coord-box {
+    background: #0f1829;
+    border: 1px solid #1e293b;
+    border-radius: 8px;
+    padding: 15px;
+    margin: 15px 0;
+  }
+  .coord-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid #1e293b;
+  }
+  .coord-row:last-child {
+    border-bottom: none;
+  }
+  .label {
+    font-size: 12px;
+    color: #94a3b8;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .value {
+    font-size: 16px;
+    color: #10b981;
+    font-weight: 700;
+    font-family: 'Courier New', monospace;
+  }
+  .btn {
+    width: 100%;
+    padding: 15px;
+    border: none;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    margin-top: 15px;
+    transition: all 0.2s;
+  }
+  .btn-start {
+    background: #10b981;
+    color: #fff;
+  }
+  .btn-start:active {
+    background: #059669;
+  }
+  .btn-stop {
+    background: #dc2626;
+    color: #fff;
+  }
+  .btn-stop:active {
+    background: #b91c1c;
+  }
+  .status {
+    text-align: center;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 15px;
+    font-size: 13px;
+    font-weight: 600;
+  }
+  .status.success {
+    background: #052e1a;
+    border: 1px solid #10b981;
+    color: #6ee7b7;
+  }
+  .status.error {
+    background: #450a0a;
+    border: 1px solid #dc2626;
+    color: #fca5a5;
+  }
+  .status.waiting {
+    background: #1c1208;
+    border: 1px solid #d97706;
+    color: #fbbf24;
+  }
+  .update-count {
+    text-align: center;
+    font-size: 12px;
+    color: #475569;
+    margin-top: 10px;
+  }
+  .pulsing {
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+  }
+</style>
+</head>
+<body>
+
+<h1>📍 GreenNote GPS Sender</h1>
+<p class="subtitle">Live GPS tracking for ESP32 demo</p>
+
+<div class="card">
+  <div class="coord-box">
+    <div class="coord-row">
+      <span class="label">Latitude</span>
+      <span class="value" id="lat">—</span>
+    </div>
+    <div class="coord-row">
+      <span class="label">Longitude</span>
+      <span class="value" id="lng">—</span>
+    </div>
+    <div class="coord-row">
+      <span class="label">Accuracy</span>
+      <span class="value" id="accuracy">—</span>
+    </div>
+  </div>
+
+  <button class="btn btn-start" id="startBtn" onclick="startTracking()">
+    ▶ Start GPS Tracking
+  </button>
+  <button class="btn btn-stop" id="stopBtn" onclick="stopTracking()" style="display:none;">
+    ⏸ Stop Tracking
+  </button>
+
+  <div class="status waiting" id="status">
+    Ready to start
+  </div>
+
+  <div class="update-count" id="updateCount">—</div>
+</div>
+
+<script>
+let watchId = null;
+let updateCount = 0;
+let backendURL = window.location.origin; // Same server
+
+// If running locally, you can override:
+// backendURL = 'http://localhost:3000';
+
+function startTracking() {
+  if (!navigator.geolocation) {
+    showStatus('Geolocation not supported', 'error');
+    return;
+  }
+
+  document.getElementById('startBtn').style.display = 'none';
+  document.getElementById('stopBtn').style.display = 'block';
+  showStatus('📡 Acquiring GPS signal...', 'waiting', true);
+
+  watchId = navigator.geolocation.watchPosition(
+    sendGPS,
+    handleError,
+    {
+      enableHighAccuracy: true,
+      timeout: 10000,
+      maximumAge: 0
+    }
+  );
+
+  console.log('GPS tracking started');
+}
+
+function stopTracking() {
+  if (watchId !== null) {
+    navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    
+    document.getElementById('startBtn').style.display = 'block';
+    document.getElementById('stopBtn').style.display = 'none';
+    showStatus('⏸ Tracking stopped', 'waiting');
+    
+    console.log('GPS tracking stopped');
+  }
+}
+
+async function sendGPS(position) {
+  const lat = position.coords.latitude;
+  const lng = position.coords.longitude;
+  const accuracy = Math.round(position.coords.accuracy);
+
+  // Update display
+  document.getElementById('lat').textContent = lat.toFixed(6);
+  document.getElementById('lng').textContent = lng.toFixed(6);
+  document.getElementById('accuracy').textContent = `±${accuracy}m`;
+
+  // Send to backend
+  try {
+    const response = await fetch(`${backendURL}/api/gps`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng, accuracy })
+    });
+
+    const data = await response.json();
+    
+    if (data.success) {
+      updateCount++;
+      showStatus(`✅ GPS sent successfully (#${updateCount})`, 'success');
+      document.getElementById('updateCount').textContent = 
+        `${updateCount} updates sent`;
+    } else {
+      showStatus('❌ Failed to send GPS', 'error');
+    }
+
+  } catch (error) {
+    console.error('Error sending GPS:', error);
+    showStatus(`❌ Network error: ${error.message}`, 'error');
+  }
+}
+
+function handleError(error) {
+  let message = 'GPS error';
+  
+  switch(error.code) {
+    case error.PERMISSION_DENIED:
+      message = '❌ Location permission denied';
+      break;
+    case error.POSITION_UNAVAILABLE:
+      message = '❌ Location unavailable';
+      break;
+    case error.TIMEOUT:
+      message = '⚠️ GPS timeout - retrying...';
+      break;
+  }
+  
+  showStatus(message, 'error');
+  console.error('GPS Error:', error);
+}
+
+function showStatus(text, type, pulsing = false) {
+  const statusEl = document.getElementById('status');
+  statusEl.textContent = text;
+  statusEl.className = `status ${type}`;
+  if (pulsing) statusEl.classList.add('pulsing');
+}
+
+// Auto-start if URL has ?autostart=true
+if (window.location.search.includes('autostart=true')) {
+  window.addEventListener('load', () => {
+    setTimeout(startTracking, 1000);
+  });
+}
+</script>
+
+</body>
+</html>
