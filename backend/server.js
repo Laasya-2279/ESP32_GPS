@@ -17,7 +17,7 @@ app.get('/api/health', (req, res) => {
 
 app.post('/api/gps', (req, res) => {
   const { latitude, longitude, timestamp } = req.body;
-  console.log(GPS Data - Lat: ${latitude}, Lon: ${longitude}, Time: ${timestamp});
+  console.log(`GPS Data - Lat: ${latitude}, Lon: ${longitude}, Time: ${timestamp}`);
   res.json({ success: true, message: 'GPS data received' });
 });
 
@@ -27,5 +27,5 @@ app.get('/', (req, res) => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(ESP32 GPS Demo server running on http://localhost:${PORT});
+  console.log(`ESP32 GPS Demo server running on http://localhost:${PORT}`);
 });
